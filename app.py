@@ -10,7 +10,7 @@ import base64
 import io
 import pytz
 
-# --- Database Setup (Unchanged) ---
+# --- Database Setup ---
 DB_FILE = 'banking_final.db5'
 
 
@@ -276,7 +276,7 @@ def create_header():
     conn.execute("SELECT SUM(amount) FROM transactions WHERE status='completed'").fetchone()[0] or 0
     return dbc.Row(dbc.Col(dbc.Card(dbc.CardBody(dbc.Row([
         dbc.Col(
-            [html.H1("Capital Pay | Integrated Platform"), html.P("Payroll & Transfer System", className="text-muted")],
+            [html.H1("Boma Money Transfer"), html.P("Where Everyone Belongs", className="text-muted")],
             width=8),
         dbc.Col(html.Div([html.Small("Total Network Volume"), html.H2(format_currency(total_volume))],
                          className="text-end"), width=4)
@@ -285,9 +285,9 @@ def create_header():
 
 def create_navigation():
     return dbc.Row(dbc.Col(dbc.Card(dbc.CardBody(dbc.ButtonGroup([
-        dbc.Button([html.I(className="fas fa-users me-2"), "Bulk Payroll"], id="btn-payroll", className="me-2"),
         dbc.Button([html.I(className="fas fa-exchange-alt me-2"), "Account Transfer"], id="btn-transfer",
                    className="me-2"),
+        dbc.Button([html.I(className="fas fa-users me-2"), "Bulk Transfers/Payroll"], id="btn-payroll", className="me-2"),
         dbc.Button([html.I(className="fas fa-credit-card me-2"), "Transactions"], id="btn-transactions",
                    className="me-2"),
         dbc.Button([html.I(className="fas fa-building me-2"), "Network Dashboard"], id="btn-dashboard",
@@ -742,3 +742,4 @@ def manual_close_processing_modal(n): return False, True
 
 if __name__ == '__main__':
     app.run(debug=True, port=6659)
+
