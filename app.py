@@ -1,3 +1,4 @@
+
 import dash
 from dash import dcc, html, Input, Output, State, callback_context, dash_table, ALL, no_update
 import dash_bootstrap_components as dbc
@@ -17,12 +18,18 @@ DB_FILE = 'banking_final.db5'
 def init_db():
     with sqlite3.connect(DB_FILE) as conn:
         cursor = conn.cursor()
+        # Core Tables
         cursor.execute(
             '''CREATE TABLE IF NOT EXISTS accounts (id TEXT PRIMARY KEY, name TEXT NOT NULL, bank TEXT NOT NULL, accountNumber TEXT NOT NULL UNIQUE, balance REAL NOT NULL, type TEXT NOT NULL)''')
         cursor.execute(
             '''CREATE TABLE IF NOT EXISTS transactions (id TEXT PRIMARY KEY, from_acct TEXT, to_acct TEXT, amount REAL NOT NULL, type TEXT NOT NULL, status TEXT NOT NULL, timestamp TEXT NOT NULL, method TEXT)''')
         cursor.execute(
             '''CREATE TABLE IF NOT EXISTS master_employees (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, bank TEXT NOT NULL, account TEXT NOT NULL, amount REAL NOT NULL, department TEXT NOT NULL)''')
+        # Tables for saving user and recipient details
+        cursor.execute(
+            '''CREATE TABLE IF NOT EXISTS saved_senders (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL UNIQUE, msisdn TEXT, id_number TEXT, email TEXT, bank_name TEXT, bank_account_number TEXT)''')
+        cursor.execute(
+            '''CREATE TABLE IF NOT EXISTS saved_recipients (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL UNIQUE, msisdn TEXT, id_number TEXT, email TEXT, bank_name TEXT, bank_account_number TEXT)''')
 
         cursor.execute("SELECT COUNT(*) FROM accounts")
         if cursor.fetchone()[0] == 0:
@@ -40,43 +47,36 @@ def init_db():
                 "INSERT INTO accounts (id, name, bank, accountNumber, balance, type) VALUES (?, ?, ?, ?, ?, ?)",
                 accounts_data)
 
-        cursor.execute("SELECT COUNT(*) FROM transactions")
-        if cursor.fetchone()[0] == 0:
-            now = datetime.datetime.now(pytz.timezone('Africa/Nairobi'))
-            initial_transactions = [('txn001', 'acc003', 'acc001', 50000, 'payroll', 'completed',
-                                     (now - datetime.timedelta(days=3)).isoformat(), 'Bulk'), (
-                                    'txn002', 'acc004', 'acc002', 12000, 'transfer', 'completed',
-                                    (now - datetime.timedelta(days=2)).isoformat(), 'RTGS'), (
-                                    'txn003', 'acc003', 'acc005', 62000, 'payroll', 'completed',
-                                    (now - datetime.timedelta(days=4)).isoformat(), 'Bulk'), (
-                                    'txn004', 'acc002', 'acc008', 7500, 'transfer', 'completed',
-                                    (now - datetime.timedelta(days=10)).isoformat(), 'IFT'), (
-                                    'txn005', 'acc003', 'acc009', 71000, 'payroll', 'completed',
-                                    (now - datetime.timedelta(days=32)).isoformat(), 'Bulk'), (
-                                    'txn006', 'acc001', 'acc004', 25000, 'transfer', 'completed',
-                                    (now - datetime.timedelta(days=35)).isoformat(), 'IFT'), (
-                                    'txn007', 'acc003', 'acc002', 45000, 'payroll', 'completed',
-                                    (now - datetime.timedelta(days=65)).isoformat(), 'Bulk'), (
-                                    'txn008', 'acc004', 'acc007', 18000, 'transfer', 'completed',
-                                    (now - datetime.timedelta(days=70)).isoformat(), 'IFT')]
-            cursor.executemany("INSERT INTO transactions VALUES (?, ?, ?, ?, ?, ?, ?, ?)", initial_transactions)
-
         cursor.execute("SELECT COUNT(*) FROM master_employees")
         if cursor.fetchone()[0] == 0:
             master_employee_data = [('John Doe', 'KCB Bank', '1234567890', 50000, 'Sales'),
                                     ('Sarah Wilson', 'Equity Bank', '2345678901', 45000, 'Marketing'),
-                                    ('Mohamed Hassan', 'Nile Commercial Bank', '5678901234', 60000, 'Engineering'),
-                                    ('Amina Yusuf', 'Ecobank', '6789012345', 52000, 'Engineering'),
-                                    ('David Chen', 'I&M Bank', '7890123456', 75000, 'Sales'),
-                                    ('Fatima Al-Jamil', 'Absa Bank', '8901234567', 91000, 'Engineering'),
-                                    ('Ken Okoro', 'NCBA Bank', '9012345678', 68000, 'HR'),
-                                    ('Maria Rodriguez', 'Diamond Trust Bank', '0123456789', 82000, 'Marketing'),
-                                    ('James Omondi', 'KCB Bank', '1122334455', 48000, 'Sales'),
-                                    ('Grace Wanjiku', 'Equity Bank', '2233445566', 53000, 'HR'),
-                                    ('Peter Musyoka', 'Co-op Bank', '3344556677', 61000, 'Engineering')]
+                                    ('Mohamed Hassan', 'Nile Commercial Bank', '5678901234', 60000, 'Engineering')]
             cursor.executemany(
                 "INSERT INTO master_employees (name, bank, account, amount, department) VALUES (?, ?, ?, ?, ?)",
                 master_employee_data)
+
+        cursor.execute("SELECT COUNT(*) FROM saved_senders")
+        if cursor.fetchone()[0] == 0:
+            senders_data = [
+                ('Alice Mwangi', '254722123456', '12345678', 'alice.m@capitalpay.corp', 'Stanbic Bank', '3456789012'),
+                ('Bob Otieno', '254711987654', '87654321', 'bob.o@capitalpay.corp', 'Stanbic Bank', '3456789012')
+            ]
+            cursor.executemany(
+                "INSERT INTO saved_senders (name, msisdn, id_number, email, bank_name, bank_account_number) VALUES (?, ?, ?, ?, ?, ?)",
+                senders_data)
+
+        cursor.execute("SELECT COUNT(*) FROM saved_recipients")
+        if cursor.fetchone()[0] == 0:
+            recipients_data = [
+                ('Charles Maina', '254700111222', '23456789', 'c.maina@email.com', 'Equity Bank', '2345678901'),
+                ('Brenda Wanjiru', '254701222333', '34567890', 'bwanjiru@email.net', 'KCB Bank', '1234567890'),
+                ('David Koech', '254702333444', '45678901', 'dkoech@email.org', 'Co-op Bank', '4567890123')
+            ]
+            cursor.executemany(
+                "INSERT INTO saved_recipients (name, msisdn, id_number, email, bank_name, bank_account_number) VALUES (?, ?, ?, ?, ?, ?)",
+                recipients_data)
+
         conn.commit()
 
 
@@ -84,7 +84,7 @@ def init_db():
 init_db()
 
 
-# --- Helper Functions (Unchanged) ---
+# --- Helper Functions ---
 def get_db_connection():
     conn = sqlite3.connect(DB_FILE)
     conn.row_factory = sqlite3.Row
@@ -94,19 +94,14 @@ def get_db_connection():
 def get_all_banks():
     with get_db_connection() as conn:
         banks = [row[0] for row in conn.execute("SELECT DISTINCT bank FROM accounts ORDER BY bank").fetchall()]
-        emp_banks = [row[0] for row in conn.execute(
-            "SELECT DISTINCT bank FROM master_employees WHERE bank IS NOT NULL AND bank != '' ORDER BY bank").fetchall()]
-        return sorted(list(set(banks + emp_banks)))
-
-
-def get_account_details(account_id):
-    with get_db_connection() as conn:
-        return conn.execute("SELECT * FROM accounts WHERE id = ?", (account_id,)).fetchone()
+    return banks
 
 
 def get_account_name(account_id):
     if not account_id: return "Corporate Payroll"
-    details = get_account_details(account_id)
+    if account_id == 'EXTERNAL_BULK': return "Multiple Recipients"
+    with get_db_connection() as conn:
+        details = conn.execute("SELECT name FROM accounts WHERE id = ?", (account_id,)).fetchone()
     return details['name'] if details else 'Unknown Account'
 
 
@@ -135,21 +130,40 @@ def parse_contents(contents, filename):
 # --- Initialize App ---
 app = dash.Dash(__name__, external_stylesheets=[dbc.themes.BOOTSTRAP, dbc.icons.FONT_AWESOME])
 app.config.suppress_callback_exceptions = True
-
+SECURE_PASSPHRASE = "BomaPay2025!"
 server = app.server
 
 
 # --- UI Component Creation Functions ---
-def create_processing_animation(status='processing', message=None):
-    if status == 'processing': return html.Div(
-        [dbc.Spinner(size="lg", color="primary"), html.H4("Securely Processing...", className="mt-3 text-primary")],
-        className="text-center p-4")
-    if status == 'success': return html.Div([html.I(className="fas fa-check-circle fa-4x text-success"),
-                                             html.H4("Transaction Successful!", className="mt-3 text-success")],
-                                            className="text-center p-4")
-    if status == 'failed': return html.Div([html.I(className="fas fa-times-circle fa-4x text-danger"),
-                                            html.H4("Transaction Failed", className="mt-3 text-danger"),
-                                            html.P(message, className="text-muted mt-2")], className="text-center p-4")
+def create_processing_animation(step=0, status='processing', message=None):
+    if status == 'failed':
+        return html.Div([
+            html.I(className="fas fa-times-circle fa-4x text-danger"),
+            html.H4("Transaction Failed", className="mt-3 text-danger"),
+            html.P(message, className="text-muted mt-2")
+        ], className="text-center p-4")
+
+    animation_steps = [
+        {"icon": "fa-network-wired", "text": "Contacting Banking Network...", "progress": 20},
+        {"icon": "fa-shield-alt", "text": "Encrypting Transaction Details...", "progress": 40},
+        {"icon": "fa-random", "text": "Authorizing Payment...", "progress": 60},
+        {"icon": "fa-money-bill-wave", "text": "Securely Transferring Funds...", "progress": 80},
+    ]
+
+    if step < len(animation_steps):
+        current_step = animation_steps[step]
+        return html.Div([
+            html.Div(html.I(className=f"fas {current_step['icon']} fa-beat-fade fa-3x text-primary"),
+                     style={'marginBottom': '20px'}),
+            html.H4(current_step['text'], className="text-primary"),
+            dbc.Progress(value=current_step['progress'], striped=True, animated=True, className="mt-3")
+        ], className="text-center p-4")
+    else:
+        return html.Div([
+            html.I(className="fas fa-check-circle fa-4x text-success"),
+            html.H4("Transaction Successful!", className="mt-3 text-success"),
+            dbc.Progress(value=100, color="success", className="mt-3")
+        ], className="text-center p-4")
 
 
 def create_mobile_keypad(pin_value=''):
@@ -176,43 +190,83 @@ def create_mobile_keypad(pin_value=''):
     ])
 
 
-def create_account_card(account_id):
-    account_data = get_account_details(account_id)
-    if not account_data: return html.Div()
-    card_type = "from" if "from-account-dropdown" in str(callback_context.triggered_id) else "to"
-    color, icon, title = ("danger", "arrow-left", "From Account") if card_type == "from" else (
-    "success", "arrow-right", "To Account")
-    return dbc.Card(dbc.CardBody([
-        dbc.Badge([html.I(className=f"fas fa-{icon} me-2"), title], color=color, className="mb-3"),
-        dbc.Row([dbc.Col([html.Strong("Account Holder:"), html.Div(account_data['name'], className="fw-bold")]),
-                 dbc.Col([html.Strong("Bank:"), html.Div(account_data['bank'], className="fw-bold")])],
-                className="mb-2"),
-        dbc.Row([dbc.Col(
-            [html.Strong("Account Number:"), html.Div(account_data['accountNumber'], className="font-monospace")]),
-                 dbc.Col([html.Strong("Balance:"),
-                          html.H4(format_currency(account_data['balance']), className=f"text-{color} fw-bold mb-0")])])
-    ]), className=f"border-{color} border-2 bg-light")
-
-
 def create_transfer_form():
     with get_db_connection() as conn:
-        accounts = conn.execute("SELECT * FROM accounts").fetchall()
-    accounts_options = [{'label': f"{acc['name']} - {acc['bank']}", 'value': acc['id']} for acc in accounts]
+        senders = conn.execute("SELECT id, name FROM saved_senders ORDER BY name").fetchall()
+        recipients = conn.execute("SELECT id, name FROM saved_recipients ORDER BY name").fetchall()
+    sender_options = [{'label': s['name'], 'value': s['id']} for s in senders]
+    recipient_options = [{'label': r['name'], 'value': r['id']} for r in recipients]
+
     return html.Div([
         html.H2("💸 Account-to-Account Transfer", className="text-center text-primary fw-bold mb-4"),
         dbc.Row([
-            dbc.Col([html.H5([html.I(className="fas fa-arrow-left text-danger me-2"), "From Account"]),
-                     dcc.Dropdown(id="from-account-dropdown", options=accounts_options),
-                     html.Div(id="from-account-details", className="mt-3")], width=6),
-            dbc.Col([html.H5([html.I(className="fas fa-arrow-right text-success me-2"), "To Account"]),
-                     dcc.Dropdown(id="to-account-dropdown", options=accounts_options),
-                     html.Div(id="to-account-details", className="mt-3")], width=6)
+            dbc.Col(dbc.Card(dbc.CardBody([
+                html.H5("Source Account Details"),
+                dcc.Dropdown(id='load-sender-dropdown', options=sender_options, placeholder="Load Saved Sender",
+                             className="mb-3"),
+                dbc.Row([
+                    dbc.Col(dbc.Input(id='senderBankName-input', placeholder="Sender's Bank Name")),
+                    dbc.Col(dbc.Input(id='senderAccountNum-input', placeholder="Sender's Account Number")),
+                ], className="mb-3"),
+                dbc.Row([
+                    dbc.Col(dbc.Input(id='senderName-input', placeholder="Sender's Full Name")),
+                    dbc.Col(dbc.Input(id='senderMSISDN-input', placeholder="Sender's Phone")),
+                ], className="mb-3"),
+                dbc.Row([
+                    dbc.Col(dbc.Input(id='senderIDNumber-input', placeholder="Sender's ID Number")),
+                    dbc.Col(dbc.Input(id='senderEmail-input', placeholder="Sender's Email (optional)")),
+                ], className="mb-3"),
+                dbc.Checkbox(id='save-sender-checkbox', label="Save my details for next time"),
+            ]), style={'backgroundColor': '#E3F2FD'}), width=6),
+
+            dbc.Col(dbc.Card(dbc.CardBody([
+                html.H5("Destination Account Details"),
+                dcc.Dropdown(id='load-recipient-dropdown', options=recipient_options,
+                             placeholder="Load Saved Recipient", className="mb-3"),
+                dbc.Row([
+                    dbc.Col(dbc.Input(id='clientBankName-input', placeholder="Recipient's Bank Name")),
+                    dbc.Col(dbc.Input(id='clientAccountNum-input', placeholder="Recipient's Account Number")),
+                ], className="mb-3"),
+                dbc.Row([
+                    dbc.Col(dbc.Input(id='clientName-input', placeholder="Recipient's Full Name (clientName)")),
+                    dbc.Col(dbc.Input(id='clientMSISDN-input', placeholder="Recipient's Phone (clientMSISDN)")),
+                ], className="mb-3"),
+                dbc.Row([
+                    dbc.Col(dbc.Input(id='clientIDNumber-input',
+                                      placeholder="Recipient's ID Number (clientIDNumber)")),
+                    dbc.Col(
+                        dbc.Input(id='clientEmail-input', placeholder="Recipient's Email (clientEmail, optional)")),
+                ], className="mb-3"),
+                dbc.Checkbox(id='save-recipient-checkbox', label="Save this recipient for next time"),
+            ]), style={'backgroundColor': '#E8F5E9'}), width=6),
         ], className="mb-4"),
-        dbc.Card(dbc.CardBody([dbc.Row([dbc.Col([html.Label("💰 Transfer Amount (KES)"), dbc.InputGroup(
-            [dbc.InputGroupText("KES"), dbc.Input(id="transfer-amount", type="number", min=1)])])])]),
-                 className="bg-light mb-4"),
-        html.Div(dbc.Button([html.I(className="fas fa-rocket me-2"), "Execute Transfer"], id="execute-transfer-btn",
-                            color="primary", size="lg", disabled=True, className="w-100"))
+
+        dbc.Card(dbc.CardBody([
+            html.H5("Transaction Details"),
+            dbc.Row([
+                dbc.Col(dbc.Input(id="amountExpected-input", type="number", min=1,
+                                  placeholder="Amount (amountExpected)")),
+                dbc.Col(dbc.Input(id="billDesc-input", placeholder="Narration (billDesc)")),
+            ])
+        ]), className="mb-4"),
+
+        html.Div([
+            dbc.Button([html.I(className="fas fa-rocket me-2"), "Execute Transfer"], id="execute-transfer-btn",
+                       color="primary", size="lg", disabled=True, className="w-100"),
+            dbc.Popover(
+                [
+                    dbc.PopoverHeader("Confirm Action"),
+                    dbc.PopoverBody([
+                        html.P("Please validate all details before proceeding."),
+                        dbc.Button("Confirm & Continue", id="confirm-transfer-popover-btn", color="success", size="sm")
+                    ]),
+                ],
+                id="transfer-popover",
+                target="execute-transfer-btn",
+                trigger="click",
+                placement="top",
+            )
+        ])
     ])
 
 
@@ -239,8 +293,9 @@ def create_payroll_section():
                                children=html.Div(['Drag & Drop or ', html.A('Select Excel/CSV File')]),
                                style={'height': '60px', 'lineHeight': '60px', 'borderWidth': '1px',
                                       'borderStyle': 'dashed', 'borderRadius': '5px', 'textAlign': 'center'}),
-                    html.Small("File must contain 'name', 'bank', 'account', and 'amount' columns.",
-                               className="text-muted")
+                    html.Small(
+                        "File must contain 'clientName', 'clientMSISDN', 'clientIDNumber', 'amountExpected', and 'billDesc' columns.",
+                        className="text-muted")
                 ], id='payroll-input-upload', style={'display': 'none'}),
                 html.Div(dbc.Button([html.I(className="fas fa-plus me-2"), "Add New Row"], id='add-payroll-row-btn',
                                     color='primary', outline=True, className="w-100"), id='payroll-input-manual',
@@ -250,30 +305,46 @@ def create_payroll_section():
         dbc.Card([
             dbc.CardHeader(html.H5("2. Review and Process Payroll Batch")),
             dbc.CardBody([
-                dbc.Button("Choose Bank for Selected Row", id="open-bank-modal-btn", color="info", className="mb-3",
-                           disabled=True),
                 dash_table.DataTable(id='payroll-table',
-                                     columns=[{"name": "ID", "id": "id"},
-                                              {"name": "Employee", "id": "name", "editable": True},
-                                              {"name": "Bank", "id": "bank", "editable": False},
-                                              {"name": "Account Number", "id": "account", "editable": True},
-                                              {"name": "Net Pay (KES)", "id": "amount", "editable": True,
-                                               "type": "numeric"}],
+                                     columns=[
+                                         {"name": "Name (clientName)", "id": "clientName"},
+                                         {"name": "Phone (clientMSISDN)", "id": "clientMSISDN"},
+                                         {"name": "ID No (clientIDNumber)", "id": "clientIDNumber"},
+                                         {"name": "Amount (amountExpected)", "id": "amountExpected", "type": "numeric",
+                                          "format": {'specifier': ',.2f'}},
+                                         {"name": "Narration (billDesc)", "id": "billDesc"}
+                                     ],
                                      data=[], row_deletable=True, style_cell={'textAlign': 'left', 'padding': '10px'},
                                      style_header={'backgroundColor': '#e9ecef', 'fontWeight': 'bold'},
-                                     style_cell_conditional=[{'if': {'column_id': 'id'}, 'display': 'none'}],
                                      ),
                 html.Div(id="payroll-summary", className="text-end fw-bold mt-3 border-top pt-3 fs-5"),
             ])
         ], className="mt-4"),
-        html.Div(dbc.Button([html.I(className="fas fa-rocket me-2"), "Process Bulk Payroll"], id="process-payroll-btn",
-                            color="success", size="lg", className="mt-4 w-100", disabled=True), className="mt-4")
+        html.Div([
+            dbc.Button([html.I(className="fas fa-rocket me-2"), "Process Bulk Payroll"], id="process-payroll-btn",
+                       color="success", size="lg", className="w-100", disabled=True),
+            dbc.Popover(
+                [
+                    dbc.PopoverHeader("Confirm Action"),
+                    dbc.PopoverBody([
+                        html.P(
+                            "You are about to process payroll for multiple employees. Please ensure the list is correct."),
+                        dbc.Button("Confirm & Continue", id="confirm-payroll-popover-btn", color="success", size="sm")
+                    ]),
+                ],
+                id="payroll-popover",
+                target="process-payroll-btn",
+                trigger="click",
+                placement="top",
+            ),
+        ], className="mt-4")
     ])
 
 
 def create_header():
-    with get_db_connection() as conn: total_volume = \
-    conn.execute("SELECT SUM(amount) FROM transactions WHERE status='completed'").fetchone()[0] or 0
+    with get_db_connection() as conn:
+        total_volume_query = "SELECT SUM(amount) FROM transactions WHERE status='completed'"
+        total_volume = conn.execute(total_volume_query).fetchone()[0] or 0
     return dbc.Row(dbc.Col(dbc.Card(dbc.CardBody(dbc.Row([
         dbc.Col(
             [html.H1("Boma Money Transfer"), html.P("Where Everyone Belongs", className="text-muted")],
@@ -287,7 +358,8 @@ def create_navigation():
     return dbc.Row(dbc.Col(dbc.Card(dbc.CardBody(dbc.ButtonGroup([
         dbc.Button([html.I(className="fas fa-exchange-alt me-2"), "Account Transfer"], id="btn-transfer",
                    className="me-2"),
-        dbc.Button([html.I(className="fas fa-users me-2"), "Bulk Transfers/Payroll"], id="btn-payroll", className="me-2"),
+        dbc.Button([html.I(className="fas fa-users me-2"), "Bulk Transfers/Payroll"], id="btn-payroll",
+                   className="me-2"),
         dbc.Button([html.I(className="fas fa-credit-card me-2"), "Transactions"], id="btn-transactions",
                    className="me-2"),
         dbc.Button([html.I(className="fas fa-building me-2"), "Network Dashboard"], id="btn-dashboard",
@@ -296,7 +368,6 @@ def create_navigation():
     ]))), className="mb-4"))
 
 
-# --- MODIFIED --- Analytics view adds a new chart placeholder
 def create_analytics_view():
     return html.Div([
         dbc.Row(id="kpi-cards", className="mb-4"),
@@ -306,64 +377,46 @@ def create_analytics_view():
         ], className="mb-4"),
         dbc.Row([
             dbc.Col(dbc.Card(dbc.CardBody([dcc.Graph(id='monthly-trends-chart')])), width=7),
-            # --- NEW CHART ---
             dbc.Col(dbc.Card(dbc.CardBody([dcc.Graph(id='top-transfer-banks-chart')])), width=5),
         ], className="mb-4")
     ])
 
 
-# --- MODIFIED --- Transactions view now uses tabs
 def create_transactions_view():
-    with get_db_connection() as conn:
-        transactions = conn.execute("SELECT * FROM transactions ORDER BY timestamp DESC").fetchall()
-
-    def generate_card(txn):
-        status_color = "success" if txn['status'] == 'completed' else "warning"
-        icon, desc = ("fa-users text-primary", f"Bulk Payroll from {get_account_name(txn['from_acct'])}") if txn[
-                                                                                                                 'type'] == 'payroll' else (
-        "fa-exchange-alt text-info", f"{get_account_name(txn['from_acct'])} → {get_account_name(txn['to_acct'])}")
-        return dbc.Card(dbc.CardBody(dbc.Row([
-            dbc.Col(html.Div([html.I(className=f"fas {icon} me-3 fs-4"), html.Div(
-                [html.H6([desc, dbc.Badge(txn['method'], color="secondary", pill=True, className="ms-2")]),
-                 html.Small(datetime.datetime.fromisoformat(txn['timestamp']).strftime("%Y-%m-%d %H:%M:%S"))])],
-                             className="d-flex align-items-center"), width=8),
-            dbc.Col(html.Div(
-                [html.H5(format_currency(txn['amount'])), dbc.Badge(txn['status'].title(), color=status_color)],
-                className="text-end"), width=4)
-        ])), className="mb-3")
-
-    all_cards = [generate_card(txn) for txn in transactions]
-    payroll_cards = [generate_card(txn) for txn in transactions if txn['type'] == 'payroll']
-    transfer_cards = [generate_card(txn) for txn in transactions if txn['type'] == 'transfer']
-
     return html.Div([
         html.H2("📊 Transaction History", className="text-primary fw-bold mb-4"),
         dbc.Tabs([
-            dbc.Tab(all_cards, label="All Transactions"),
-            dbc.Tab(transfer_cards, label="💸 Account Transfers"),
-            dbc.Tab(payroll_cards, label="💼 Bulk Payroll"),
+            dbc.Tab(html.Div(id='all-transactions-content',
+                             children=[dbc.Spinner(color="primary")]), label="All Transactions"),
+            dbc.Tab(html.Div(id='transfer-transactions-content',
+                             children=[dbc.Spinner(color="primary")]), label="💸 Account Transfers"),
+            dbc.Tab(html.Div(id='payroll-transactions-content',
+                             children=[dbc.Spinner(color="primary")]), label="💼 Bulk Payroll"),
         ])
     ])
 
 
-# --- MODIFIED --- Dashboard now shows more specific stats and dynamic bank data
 def create_dashboard():
     banks = get_all_banks()
+    today_str = datetime.datetime.now(pytz.timezone('Africa/Nairobi')).strftime('%Y-%m-%d')
+    seven_days_ago_str = (datetime.datetime.now(pytz.timezone('Africa/Nairobi')) - datetime.timedelta(days=7)).strftime(
+        '%Y-%m-%d')
+
     with get_db_connection() as conn:
         num_accounts = conn.execute("SELECT COUNT(*) FROM accounts").fetchone()[0]
-        # More specific queries for today's transactions
         transfers_today = conn.execute(
-            "SELECT COUNT(*) FROM transactions WHERE date(timestamp) = date('now') AND type = 'transfer'").fetchone()[0]
+            "SELECT COUNT(*) FROM transactions WHERE DATE(timestamp) = ? AND type = 'transfer'",
+            (today_str,)).fetchone()[0]
         payrolls_today = conn.execute(
-            "SELECT COUNT(*) FROM transactions WHERE date(timestamp) = date('now') AND type = 'payroll'").fetchone()[0]
-        # Query for bank volume in the last 7 days
+            "SELECT COUNT(*) FROM transactions WHERE DATE(timestamp) = ? AND type = 'payroll'",
+            (today_str,)).fetchone()[0]
         bank_volumes = conn.execute("""
             SELECT a.bank, SUM(t.amount) as volume
             FROM transactions t
             JOIN accounts a ON t.to_acct = a.id
-            WHERE date(t.timestamp) >= date('now', '-7 days') AND t.type = 'transfer'
+            WHERE DATE(t.timestamp) >= ?
             GROUP BY a.bank
-        """).fetchall()
+        """, (seven_days_ago_str,)).fetchall()
         bank_volume_map = {row['bank']: row['volume'] for row in bank_volumes}
 
     bank_cards = []
@@ -377,7 +430,7 @@ def create_dashboard():
                 html.H4(format_currency(volume), className="text-info"),
                 html.Small("7-Day Inbound Volume", className="text-muted")
             ])
-        ]), width=3, className="mb-3")
+        ]), md=4, lg=3, className="mb-3")
         bank_cards.append(card)
 
     return dbc.Row([
@@ -387,53 +440,57 @@ def create_dashboard():
             dbc.Row([dbc.Col("Active Accounts"),
                      dbc.Col(html.Strong(num_accounts, className="text-primary"), width="auto")], className="mb-3"),
             dbc.Row([dbc.Col("Today's Transfers"),
-                     dbc.Col(html.Strong(transfers_today, className="text-success"), width="auto")], className="mb-3"),
+                     dbc.Col(html.Strong(transfers_today, className="text-success"), width="auto")],
+                    className="mb-3"),
             dbc.Row([dbc.Col("Today's Payrolls"),
                      dbc.Col(html.Strong(payrolls_today, className="text-info"), width="auto")])
         ])]), width=3)
     ])
 
 
-def create_bank_selection_modal():
-    banks = get_all_banks()
-    list_group = dbc.ListGroup(
-        [dbc.ListGroupItem(bank, action=True, id={'type': 'bank-select-item', 'index': bank}) for bank in banks],
-        flush=True)
-    return dbc.Modal([dbc.ModalHeader("Select a Bank"), dbc.ModalBody(list_group)], id="bank-selection-modal",
-                     is_open=False)
-
-
 # --- App Layout ---
 app.layout = dbc.Container([
-    dcc.Store(id='current-view-store', data='payroll'),
+    dcc.Store(id='current-view-store', data='transfer'),
     dcc.Store(id='current-pin-store', data=''),
     dcc.Store(id='pending-transaction-store', data={}),
     dcc.Store(id='transaction-refresh-signal', data=None),
+    dcc.Store(id='animation-step-store', data=0),
+    dcc.Interval(id='animation-interval', interval=2000, n_intervals=0, disabled=True),
     dcc.Interval(id='interval-component', interval=3000, n_intervals=0, disabled=True),
 
-    dbc.Modal([dbc.ModalHeader(dbc.ModalTitle(id="payment-modal-title")), dbc.ModalBody(id="payment-confirmation-body"),
-               dbc.ModalFooter(
-                   [dbc.Button("Cancel", id="cancel-payment-btn"), dbc.Button("Continue", id="continue-to-pin-btn")])],
-              id="payment-modal", is_open=False),
+    dbc.Modal([
+        dbc.ModalHeader(html.H4("🔒 Secure Passphrase Verification")),
+        dbc.ModalBody([
+            html.P("Please review the transaction details below and enter your security passphrase to proceed."),
+            html.Div(id="passphrase-summary-body"),
+            html.Hr(),
+            dbc.Input(id="security-passphrase-input", type="password", placeholder="Enter your secret passphrase"),
+            html.Div(id="passphrase-alert-container", className="mt-2")
+        ]),
+        dbc.ModalFooter([
+            dbc.Button("Cancel", id="passphrase-cancel-btn", color="secondary"),
+            dbc.Button("Submit Passphrase", id="submit-passphrase-btn", color="primary")
+        ])
+    ], id="passphrase-modal", is_open=False, backdrop="static"),
+
     dbc.Modal([dbc.ModalHeader("Secure PIN Entry"), dbc.ModalBody(id="pin-entry-body"),
                dbc.ModalFooter(dbc.Button("Cancel", id="pin-cancel-btn"))], id="pin-modal", is_open=False,
               backdrop="static"),
     dbc.Modal(
         [dbc.ModalBody(id="processing-body"), dbc.ModalFooter(dbc.Button("Close", id="close-processing-modal-btn"))],
         id="processing-modal", is_open=False, centered=True),
-    create_bank_selection_modal(),
 
     html.Div(id='header-container'),
     create_navigation(),
 
     html.Div([
-        html.Div(create_payroll_section(), id='page-payroll'),
-        html.Div(create_transfer_form(), id='page-transfer', style={'display': 'none'}),
+        html.Div(create_payroll_section(), id='page-payroll', style={'display': 'none'}),
+        html.Div(create_transfer_form(), id='page-transfer'),
         html.Div(create_transactions_view(), id='page-transactions', style={'display': 'none'}),
-        html.Div(create_dashboard(), id='page-dashboard', style={'display': 'none'}),
+        html.Div(id='page-dashboard', style={'display': 'none'}),
         html.Div(create_analytics_view(), id='page-analytics', style={'display': 'none'}),
     ])
-], className="py-4", style={'maxWidth': '70%', 'backgroundColor': '#f8f9fa'})
+], className="py-4", style={'maxWidth': '85%', 'backgroundColor': '#f8f9fa'})
 
 
 # --- Callbacks ---
@@ -444,7 +501,7 @@ app.layout = dbc.Container([
 )
 def update_active_button(p, t, r, d, a):
     ctx = callback_context
-    button_id = ctx.triggered[0]['prop_id'].split('.')[0] if ctx.triggered else 'btn-payroll'
+    button_id = ctx.triggered[0]['prop_id'].split('.')[0] if ctx.triggered else 'btn-transfer'
     view_name = button_id.replace('btn-', '')
     colors = {v: 'outline-primary' for v in ['payroll', 'transfer', 'transactions', 'dashboard', 'analytics']}
     colors[view_name] = 'primary'
@@ -463,270 +520,445 @@ def display_page(view_name):
     return styles['payroll'], styles['transfer'], styles['transactions'], styles['dashboard'], styles['analytics']
 
 
-@app.callback(Output('header-container', 'children'), Input('transaction-refresh-signal', 'data'))
-def update_header_live(refresh_signal): return create_header()
+@app.callback(Output('header-container', 'children'),
+              [Input('transaction-refresh-signal', 'data'), Input('current-view-store', 'data')])
+def update_header_live(refresh_signal, view):
+    return create_header()
 
 
 @app.callback(
-    [Output('payroll-mode-store', 'data'), Output('btn-mode-select', 'color'), Output('btn-mode-upload', 'color'),
-     Output('btn-mode-manual', 'color'),
-     Output('payroll-input-select', 'style'), Output('payroll-input-upload', 'style'),
-     Output('payroll-input-manual', 'style')],
-    [Input('btn-mode-select', 'n_clicks'), Input('btn-mode-upload', 'n_clicks'), Input('btn-mode-manual', 'n_clicks')]
+    Output('all-transactions-content', 'children'),
+    Output('transfer-transactions-content', 'children'),
+    Output('payroll-transactions-content', 'children'),
+    Input('transaction-refresh-signal', 'data'),
+    Input('current-view-store', 'data')
 )
-def switch_payroll_mode(select_clicks, upload_clicks, manual_clicks):
-    ctx = callback_context
-    button_id = ctx.triggered[0]['prop_id'].split('.')[0] if ctx.triggered else 'btn-mode-select'
-    if button_id == 'btn-mode-upload':
-        return 'upload', 'secondary', 'primary', 'secondary', {'display': 'none'}, {'display': 'block'}, {
-            'display': 'none'}
-    elif button_id == 'btn-mode-manual':
-        return 'manual', 'secondary', 'secondary', 'primary', {'display': 'none'}, {'display': 'none'}, {
-            'display': 'block'}
-    return 'select', 'primary', 'secondary', 'secondary', {'display': 'block'}, {'display': 'none'}, {'display': 'none'}
+def update_transaction_tables(refresh_signal, view_name):
+    if view_name != 'transactions':
+        return no_update, no_update, no_update
+
+    with get_db_connection() as conn:
+        df = pd.read_sql_query("SELECT * FROM transactions ORDER BY timestamp DESC", conn)
+
+    if df.empty:
+        no_data_msg = html.Div("No transactions found.", className="text-center text-muted p-4")
+        return no_data_msg, no_data_msg, no_data_msg
+
+    df['from_acct'] = df['from_acct'].apply(get_account_name)
+    df['to_acct'] = df['to_acct'].apply(get_account_name)
+    df['amount'] = df['amount'].apply(format_currency)
+    df['timestamp'] = pd.to_datetime(df['timestamp']).dt.strftime('%Y-%m-%d %H:%M:%S')
+
+    df.rename(columns={
+        'id': 'Reference', 'from_acct': 'From', 'to_acct': 'To', 'amount': 'Amount',
+        'type': 'Type', 'status': 'Status', 'timestamp': 'Timestamp'
+    }, inplace=True)
+
+    table_style = {
+        'style_cell': {'textAlign': 'left', 'padding': '10px', 'fontFamily': 'sans-serif'},
+        'style_header': {'backgroundColor': '#e9ecef', 'fontWeight': 'bold'},
+        'style_data_conditional': [{'if': {'row_index': 'odd'}, 'backgroundColor': 'rgb(248, 248, 248)'}],
+        'page_size': 10,
+    }
+
+    all_table = dash_table.DataTable(data=df.to_dict('records'),
+                                     columns=[{'name': i, 'id': i} for i in df.columns if i != 'method'], **table_style)
+    transfer_table = dash_table.DataTable(data=df[df['Type'] == 'transfer'].to_dict('records'),
+                                          columns=[{'name': i, 'id': i} for i in df.columns if i != 'method'],
+                                          **table_style)
+    payroll_table = dash_table.DataTable(data=df[df['Type'] == 'payroll'].to_dict('records'),
+                                         columns=[{'name': i, 'id': i} for i in df.columns if i != 'method'],
+                                         **table_style)
+
+    return all_table, transfer_table, payroll_table
 
 
-# --- MODIFIED to be responsive to new transactions ---
 @app.callback(
-    [Output('kpi-cards', 'children'),
-     Output('payroll-by-dept-chart', 'figure'),
-     Output('transfer-dist-chart', 'figure'),
-     Output('monthly-trends-chart', 'figure'),
-     Output('top-transfer-banks-chart', 'figure')],
-    [Input('current-view-store', 'data'),
-     # --- ADDED an Input to listen for the refresh signal ---
-     Input('transaction-refresh-signal', 'data')]
+    Output('page-dashboard', 'children'),
+    Input('transaction-refresh-signal', 'data'),
+    Input('current-view-store', 'data')
 )
-def update_analytics(view, refresh_signal):
-    # --- MODIFIED the function signature to accept the new input ---
-    if view != 'analytics':
+def update_dashboard(refresh_signal, view_name):
+    if view_name == 'dashboard':
+        return create_dashboard()
+    return no_update
+
+
+@app.callback(
+    Output('kpi-cards', 'children'),
+    Output('payroll-by-dept-chart', 'figure'),
+    Output('transfer-dist-chart', 'figure'),
+    Output('monthly-trends-chart', 'figure'),
+    Output('top-transfer-banks-chart', 'figure'),
+    Input('current-view-store', 'data'),
+    prevent_initial_call=True
+)
+def update_analytics_page(view_name):
+    if view_name != 'analytics':
         return no_update, no_update, no_update, no_update, no_update
 
     with get_db_connection() as conn:
-        df = pd.read_sql_query("SELECT * FROM transactions WHERE status='completed'", conn)
-        emp_df = pd.read_sql_query("SELECT department, amount FROM master_employees", conn)
-        banks_df = pd.read_sql_query("SELECT id, bank FROM accounts", conn)
+        total_volume = conn.execute("SELECT SUM(amount) FROM transactions WHERE status='completed'").fetchone()[0] or 0
+        total_transactions = conn.execute("SELECT COUNT(*) FROM transactions WHERE status='completed'").fetchone()[
+                                 0] or 0
+        avg_transfer = \
+        conn.execute("SELECT AVG(amount) FROM transactions WHERE status='completed' AND type='transfer'").fetchone()[
+            0] or 0
+        df_payroll = pd.read_sql_query(
+            "SELECT department, SUM(amount) as total_payroll FROM master_employees GROUP BY department", conn)
+        df_trans = pd.read_sql_query("SELECT amount FROM transactions WHERE status='completed'", conn)
+        df_trends = pd.read_sql_query(
+            "SELECT STRFTIME('%Y-%m', timestamp) as month, SUM(amount) as volume FROM transactions WHERE status='completed' GROUP BY month ORDER BY month ASC",
+            conn)
+        df_banks = pd.read_sql_query("""
+            SELECT a.bank, SUM(t.amount) as volume
+            FROM transactions t JOIN accounts a ON t.to_acct = a.id
+            WHERE t.status='completed'
+            GROUP BY a.bank ORDER BY volume DESC LIMIT 5
+        """, conn)
 
-    df['timestamp'] = pd.to_datetime(df['timestamp']).dt.tz_convert('Africa/Nairobi')
-    today = pd.Timestamp.now(tz='Africa/Nairobi').normalize()
-    start_of_week, start_of_month = today - pd.to_timedelta(today.weekday()), today.replace(day=1)
+    kpi_cards = [
+        dbc.Col(dbc.Card(
+            dbc.CardBody([html.H4(format_currency(total_volume)), html.P("Total Volume", className="text-muted")])),
+                width=4),
+        dbc.Col(dbc.Card(
+            dbc.CardBody([html.H4(f"{total_transactions:,}"), html.P("Total Transactions", className="text-muted")])),
+                width=4),
+        dbc.Col(dbc.Card(dbc.CardBody(
+            [html.H4(format_currency(avg_transfer)), html.P("Avg. Transfer Amount", className="text-muted")])),
+                width=4),
+    ]
 
-    payroll_df = df[df['type'] == 'payroll']
-    transfer_df = df[df['type'] == 'transfer']
+    fig_payroll = px.bar(df_payroll, x='department', y='total_payroll', title="Payroll Costs by Department",
+                         labels={'department': 'Department', 'total_payroll': 'Total Payroll Amount'})
+    fig_payroll.update_layout(title_x=0.5)
 
-    p_month_vol, p_month_count = payroll_df[payroll_df['timestamp'] >= start_of_month]['amount'].sum(), len(
-        payroll_df[payroll_df['timestamp'] >= start_of_month])
-    p_week_vol, p_week_count = payroll_df[payroll_df['timestamp'] >= start_of_week]['amount'].sum(), len(
-        payroll_df[payroll_df['timestamp'] >= start_of_week])
-    t_month_vol, t_month_count = transfer_df[transfer_df['timestamp'] >= start_of_month]['amount'].sum(), len(
-        transfer_df[transfer_df['timestamp'] >= start_of_month])
-    t_week_vol, t_week_count = transfer_df[transfer_df['timestamp'] >= start_of_week]['amount'].sum(), len(
-        transfer_df[transfer_df['timestamp'] >= start_of_week])
+    bins = [0, 10000, 50000, 100000, float('inf')]
+    labels = ['< 10k', '10k - 50k', '50k - 100k', '> 100k']
+    df_trans['range'] = pd.cut(df_trans['amount'], bins=bins, labels=labels, right=False)
+    dist_data = df_trans['range'].value_counts().reset_index()
+    dist_data.columns = ['range', 'count']
+    fig_dist = px.pie(dist_data, names='range', values='count', title="Distribution of Transaction Sizes", hole=.3)
+    fig_dist.update_layout(title_x=0.5)
 
-    kpi_cards = dbc.Row([
-        dbc.Col(html.H4("This Month's Activity"), width=12),
-        dbc.Col(dbc.Card([dbc.CardBody(
-            [html.H6("Bulk Payroll"), html.H3(format_currency(p_month_vol), className="text-primary"),
-             html.P(f"{p_month_count} Batches")])]), width=6, className="mb-3"),
-        dbc.Col(dbc.Card([dbc.CardBody(
-            [html.H6("Account Transfers"), html.H3(format_currency(t_month_vol), className="text-success"),
-             html.P(f"{t_month_count} Transfers")])]), width=6, className="mb-3"),
-        dbc.Col(html.H4("This Week's Activity"), width=12),
-        dbc.Col(dbc.Card([dbc.CardBody(
-            [html.H6("Bulk Payroll"), html.H3(format_currency(p_week_vol), className="text-primary"),
-             html.P(f"{p_week_count} Batches")])]), width=6, className="mb-3"),
-        dbc.Col(dbc.Card([dbc.CardBody(
-            [html.H6("Account Transfers"), html.H3(format_currency(t_week_vol), className="text-success"),
-             html.P(f"{t_week_count} Transfers")])]), width=6, className="mb-3"),
-    ])
+    fig_trends = px.line(df_trends, x='month', y='volume', title="Monthly Transaction Volume", markers=True,
+                         labels={'month': 'Month', 'volume': 'Transaction Volume'})
+    fig_trends.update_layout(title_x=0.5)
 
-    dept_payroll = emp_df.groupby('department')['amount'].sum().reset_index()
-    fig_dept = px.pie(dept_payroll, names='department', values='amount', title='Projected Payroll by Department',
-                      hole=0.4)
-    fig_dist = px.histogram(transfer_df, x='amount', nbins=20, title='Transfer Amount Distribution')
+    fig_banks = px.bar(df_banks, x='bank', y='volume', title="Top 5 Banks by Inbound Volume",
+                       labels={'bank': 'Bank', 'volume': 'Inbound Volume'})
+    fig_banks.update_layout(title_x=0.5)
 
-    payroll_monthly, transfer_monthly = payroll_df.set_index('timestamp').resample('M')['amount'].sum(), \
-    transfer_df.set_index('timestamp').resample('M')['amount'].sum()
-    trends_df = pd.DataFrame({'Payroll': payroll_monthly, 'Transfers': transfer_monthly}).reset_index()
-    trends_df['timestamp'] = trends_df['timestamp'].dt.strftime('%Y-%b')
-    fig_trends = px.line(trends_df, x='timestamp', y=['Payroll', 'Transfers'], title='Monthly Volume Trends',
-                         markers=True)
-
-    transfer_banks = pd.merge(transfer_df, banks_df, left_on='to_acct', right_on='id', how='left')
-    top_banks = transfer_banks.groupby('bank')['amount'].sum().nlargest(5).reset_index()
-    fig_top_banks = px.bar(top_banks, x='bank', y='amount', title='Top 5 Transfer Destinations (by Bank)',
-                           labels={'bank': 'Bank', 'amount': 'Total Volume'})
-
-    return kpi_cards, fig_dept, fig_dist, fig_trends, fig_top_banks
+    return kpi_cards, fig_payroll, fig_dist, fig_trends, fig_banks
 
 
-@app.callback(Output('open-bank-modal-btn', 'disabled'), Input('payroll-table', 'active_cell'))
-def toggle_open_bank_modal_button(active_cell):
-    return not (active_cell and active_cell['column_id'] == 'bank')
-
-
-@app.callback([Output('bank-selection-modal', 'is_open'), Output('bank-selection-store', 'data')],
-              Input('open-bank-modal-btn', 'n_clicks'), State('payroll-table', 'active_cell'),
-              prevent_initial_call=True)
-def open_bank_modal_and_store_row(n, cell):
-    if n: return True, {'row': cell['row']}
-    return False, no_update
-
-
-@app.callback([Output('payroll-table', 'data', allow_duplicate=True),
-               Output('bank-selection-modal', 'is_open', allow_duplicate=True)],
-              Input({'type': 'bank-select-item', 'index': ALL}, 'n_clicks'),
-              [State('bank-selection-store', 'data'), State('payroll-table', 'data')], prevent_initial_call=True)
-def select_bank_and_update_table(clicks, store, table):
-    if not any(clicks): return no_update
-    bank_name = callback_context.triggered_id['index']
-    table[store['row']]['bank'] = bank_name
-    return table, False
-
-
-@app.callback(Output('from-account-details', 'children'), Input('from-account-dropdown', 'value'))
-def update_from_account_details(account_id):
-    if account_id: return create_account_card(account_id)
-    return html.Div()
-
-
-@app.callback(Output('to-account-details', 'children'), Input('to-account-dropdown', 'value'))
-def update_to_account_details(account_id):
-    if account_id: return create_account_card(account_id)
-    return html.Div()
-
-
-@app.callback(Output('execute-transfer-btn', 'disabled'),
-              [Input('from-account-dropdown', 'value'), Input('to-account-dropdown', 'value'),
-               Input('transfer-amount', 'value')])
-def toggle_execute_button(f, t, a):
-    return not all([f, t, a and float(a) > 0, f != t])
-
-
-@app.callback(Output('payroll-table', 'data'),
-              [Input('employee-selection-dropdown', 'value'), Input('upload-payroll-data', 'contents'),
-               Input('add-payroll-row-btn', 'n_clicks')],
-              [State('payroll-mode-store', 'data'), State('upload-payroll-data', 'filename'),
-               State('payroll-table', 'data')], prevent_initial_call=True)
-def update_payroll_table_data(ids, contents, clicks, mode, filename, data):
-    trig_id = callback_context.triggered_id
-    if mode == 'select' and trig_id == 'employee-selection-dropdown':
-        if not ids: return []
-        placeholders = ','.join(['?'] * len(ids))
-        with get_db_connection() as conn:
-            df = pd.read_sql_query(
-                f"SELECT id, name, bank, account, amount FROM master_employees WHERE id IN ({placeholders})", conn,
-                params=ids)
-        return df.to_dict('records')
-    elif mode == 'upload' and contents:
-        df = parse_contents(contents, filename)
-        cols = ['name', 'bank', 'account', 'amount']
-        if isinstance(df, pd.DataFrame) and all(c in df.columns for c in cols): return df[cols].to_dict('records')
+# --- NEW --- Callback to populate the payroll table when employees are selected
+@app.callback(
+    Output('payroll-table', 'data'),
+    Input('employee-selection-dropdown', 'value')
+)
+def update_payroll_table(employee_ids):
+    if not employee_ids:
         return []
-    elif mode == 'manual' and trig_id == 'add-payroll-row-btn':
-        new_row = {'id': None, 'name': '', 'bank': '(Click to select)', 'account': '', 'amount': None}
-        return (data or []) + [new_row]
-    return no_update
+
+    # Create a string of question marks for the SQL query
+    placeholders = ','.join(['?'] * len(employee_ids))
+    query = f"""
+        SELECT 
+            name AS clientName, 
+            account AS clientMSISDN, 
+            'N/A' AS clientIDNumber, 
+            amount AS amountExpected, 
+            'Monthly Salary' AS billDesc 
+        FROM master_employees 
+        WHERE id IN ({placeholders})
+    """
+    with get_db_connection() as conn:
+        df = pd.read_sql_query(query, conn, params=employee_ids)
+
+    return df.to_dict('records')
 
 
-@app.callback([Output('payroll-summary', 'children'), Output('process-payroll-btn', 'disabled')],
-              Input('payroll-table', 'data'))
-def update_payroll_summary(data):
-    if not data: return "Total Payroll: KES 0.00 | Employees: 0", True
-    total = sum(float(row.get('amount') or 0) for row in data)
-    return f"Total: {format_currency(total)} | Employees: {len(data)}", total <= 0
+# --- NEW --- Callback to enable/disable the process payroll button
+@app.callback(
+    Output('process-payroll-btn', 'disabled'),
+    Input('payroll-table', 'data')
+)
+def toggle_process_payroll_button(data):
+    return not data
 
 
-@app.callback([Output('payment-modal', 'is_open'), Output('payment-modal-title', 'children'),
-               Output('payment-confirmation-body', 'children'), Output('pending-transaction-store', 'data')],
-              [Input('execute-transfer-btn', 'n_clicks'), Input('process-payroll-btn', 'n_clicks')],
-              [State('from-account-dropdown', 'value'), State('to-account-dropdown', 'value'),
-               State('transfer-amount', 'value'), State('payroll-table', 'data')], prevent_initial_call=True)
-def handle_confirmation(t_clicks, p_clicks, f_acct, t_acct, amt, p_data):
+@app.callback(
+    [Output('senderName-input', 'value'), Output('senderMSISDN-input', 'value'),
+     Output('senderIDNumber-input', 'value'), Output('senderEmail-input', 'value'),
+     Output('senderBankName-input', 'value'), Output('senderAccountNum-input', 'value')],
+    Input('load-sender-dropdown', 'value'),
+    prevent_initial_call=True
+)
+def load_saved_sender(sender_id):
+    if not sender_id:
+        return "", "", "", "", "", ""
+    with get_db_connection() as conn:
+        sender = conn.execute("SELECT * FROM saved_senders WHERE id = ?", (sender_id,)).fetchone()
+    if sender:
+        return sender['name'], sender['msisdn'], sender['id_number'], sender['email'], sender['bank_name'], sender[
+            'bank_account_number']
+    return [no_update] * 6
+
+
+@app.callback(
+    [Output('clientName-input', 'value'), Output('clientMSISDN-input', 'value'),
+     Output('clientIDNumber-input', 'value'), Output('clientEmail-input', 'value'),
+     Output('clientBankName-input', 'value'), Output('clientAccountNum-input', 'value')],
+    Input('load-recipient-dropdown', 'value'),
+    prevent_initial_call=True
+)
+def load_saved_recipient(recipient_id):
+    if not recipient_id:
+        return "", "", "", "", "", ""
+    with get_db_connection() as conn:
+        recipient = conn.execute("SELECT * FROM saved_recipients WHERE id = ?", (recipient_id,)).fetchone()
+    if recipient:
+        return recipient['name'], recipient['msisdn'], recipient['id_number'], recipient['email'], recipient[
+            'bank_name'], recipient['bank_account_number']
+    return [no_update] * 6
+
+
+@app.callback(
+    Output('execute-transfer-btn', 'disabled'),
+    [Input('senderName-input', 'value'), Input('senderAccountNum-input', 'value'),
+     Input('clientName-input', 'value'), Input('clientAccountNum-input', 'value'),
+     Input('amountExpected-input', 'value')]
+)
+def toggle_execute_button(s_name, s_acct, r_name, r_acct, amount):
+    return not all([s_name, s_acct, r_name, r_acct, amount])
+
+
+# --- MODIFIED --- This callback now handles the payroll confirmation workflow
+@app.callback(
+    [Output('passphrase-modal', 'is_open'), Output('passphrase-summary-body', 'children'),
+     Output('pending-transaction-store', 'data'),
+     Output('transfer-popover', 'is_open'), Output('payroll-popover', 'is_open'),
+     Output('load-sender-dropdown', 'options'), Output('load-recipient-dropdown', 'options')],
+    [Input('confirm-transfer-popover-btn', 'n_clicks'), Input('confirm-payroll-popover-btn', 'n_clicks')],
+    [State('senderName-input', 'value'), State('senderMSISDN-input', 'value'),
+     State('senderIDNumber-input', 'value'), State('senderEmail-input', 'value'),
+     State('senderBankName-input', 'value'), State('senderAccountNum-input', 'value'),
+     State('save-sender-checkbox', 'value'),
+     State('clientName-input', 'value'), State('clientMSISDN-input', 'value'),
+     State('clientIDNumber-input', 'value'), State('clientEmail-input', 'value'),
+     State('clientBankName-input', 'value'), State('clientAccountNum-input', 'value'),
+     State('save-recipient-checkbox', 'value'),
+     State('amountExpected-input', 'value'), State('billDesc-input', 'value'),
+     State('payroll-table', 'data')],
+    prevent_initial_call=True
+)
+def handle_confirmation(t_clicks, p_clicks, s_name, s_msisdn, s_id, s_email, s_bank, s_acct, save_sender,
+                        r_name, r_msisdn, r_id, r_email, r_bank, r_acct, save_recipient, amount, desc, p_data):
     trig_id = callback_context.triggered_id
-    if trig_id == 'execute-transfer-btn':
-        data = {'type': 'transfer', 'from': f_acct, 'to': t_acct, 'amount': float(amt)}
-        body = html.Div([dbc.Row([dbc.Col("From:"), dbc.Col(get_account_name(f_acct))]),
-                         dbc.Row([dbc.Col("To:"), dbc.Col(get_account_name(t_acct))]), html.Hr(),
-                         html.H2(format_currency(float(amt)))])
-        return True, "Confirm Transfer", body, data
-    elif trig_id == 'process-payroll-btn':
-        total = sum(float(row.get('amount') or 0) for row in p_data)
-        data = {'type': 'payroll', 'employees': p_data, 'amount': total}
-        body = html.Div([dbc.Alert(f"Process payment for {len(p_data)} employees?"), html.Hr(),
-                         dbc.Row([dbc.Col("Total:"), dbc.Col(html.H3(format_currency(total)))])])
-        return True, "Confirm Payroll", body, data
-    return no_update
+    sender_options, recipient_options = no_update, no_update
+
+    with get_db_connection() as conn:
+        if save_sender and s_name:
+            conn.execute(
+                "INSERT OR REPLACE INTO saved_senders (name, msisdn, id_number, email, bank_name, bank_account_number) VALUES (?, ?, ?, ?, ?, ?)",
+                (s_name, s_msisdn, s_id, s_email, s_bank, s_acct))
+            conn.commit()
+            senders = conn.execute("SELECT id, name FROM saved_senders ORDER BY name").fetchall()
+            sender_options = [{'label': s['name'], 'value': s['id']} for s in senders]
+
+        if save_recipient and r_name:
+            conn.execute(
+                "INSERT OR REPLACE INTO saved_recipients (name, msisdn, id_number, email, bank_name, bank_account_number) VALUES (?, ?, ?, ?, ?, ?)",
+                (r_name, r_msisdn, r_id, r_email, r_bank, r_acct))
+            conn.commit()
+            recipients = conn.execute("SELECT id, name FROM saved_recipients ORDER BY name").fetchall()
+            recipient_options = [{'label': r['name'], 'value': r['id']} for r in recipients]
+
+    if trig_id == 'confirm-transfer-popover-btn':
+        ref = f'INV-{uuid.uuid4().hex[:8].upper()}'
+        data = {'type': 'transfer', 'payload': {
+            'senderName': s_name, 'senderAccount': s_acct, 'senderBank': s_bank,
+            'clientName': r_name, 'clientAccount': r_acct, 'clientBank': r_bank, 'clientMSISDN': r_msisdn,
+            'amountExpected': float(amount), 'billRefNumber': ref, 'billDesc': desc
+        }}
+        summary_list = dbc.ListGroup([
+            dbc.ListGroupItem(f"Debiting From: {s_name} ({s_bank})", className="text-danger fw-bold"),
+            dbc.ListGroupItem(f"Account Number: {s_acct}"),
+            html.Hr(),
+            dbc.ListGroupItem(f"Recipient: {r_name} ({r_acct})"),
+            dbc.ListGroupItem(f"Recipient Bank: {r_bank}"),
+            dbc.ListGroupItem(f"Bill Reference: {ref}"),
+            dbc.ListGroupItem(f"Amount: {format_currency(amount)}", color="primary", className="fw-bold"),
+        ], flush=True, className="mb-3")
+        return True, summary_list, data, False, False, sender_options, recipient_options
+
+    elif trig_id == 'confirm-payroll-popover-btn':
+        if not p_data:
+            return no_update, no_update, no_update, False, False, sender_options, recipient_options
+
+        total_amount = sum(float(row.get('amountExpected', 0)) for row in p_data)
+        num_employees = len(p_data)
+        ref = f'PAYROLL-{uuid.uuid4().hex[:6].upper()}'
+        data = {'type': 'payroll', 'amount': total_amount, 'ref': ref}
+
+        summary_list = dbc.ListGroup([
+            dbc.ListGroupItem(f"Processing payroll for {num_employees} employees.", className="text-info fw-bold"),
+            dbc.ListGroupItem(f"Batch Reference: {ref}"),
+            dbc.ListGroupItem(f"Total Amount: {format_currency(total_amount)}", color="primary", className="fw-bold"),
+        ], flush=True, className="mb-3")
+
+        return True, summary_list, data, False, False, sender_options, recipient_options
+
+    return no_update, no_update, no_update, False, False, sender_options, recipient_options
+
+
+@app.callback(
+    [Output('pin-modal', 'is_open'),
+     Output('passphrase-modal', 'is_open', allow_duplicate=True),
+     Output('passphrase-alert-container', 'children'),
+     Output('current-pin-store', 'data', allow_duplicate=True),
+     Output('pin-entry-body', 'children', allow_duplicate=True)],
+    [Input('submit-passphrase-btn', 'n_clicks'), Input('passphrase-cancel-btn', 'n_clicks')],
+    [State('security-passphrase-input', 'value')],
+    prevent_initial_call=True
+)
+def handle_passphrase_submission(submit_clicks, cancel_clicks, passphrase):
+    trig_id = callback_context.triggered_id
+    if trig_id == 'passphrase-cancel-btn':
+        return False, False, None, no_update, no_update
+
+    if passphrase == SECURE_PASSPHRASE:
+        return True, False, None, '', create_mobile_keypad('')
+    else:
+        alert = dbc.Alert("Invalid Passphrase. Please try again.", color="danger", dismissable=True, duration=4000)
+        return False, True, alert, no_update, no_update
 
 
 @app.callback(
     [Output('processing-modal', 'is_open'), Output('processing-body', 'children'),
-     Output('payment-modal', 'is_open', allow_duplicate=True),
+     Output('pin-modal', 'is_open', allow_duplicate=True),
      Output('current-pin-store', 'data', allow_duplicate=True), Output('transaction-refresh-signal', 'data'),
-     Output('interval-component', 'disabled', allow_duplicate=True)],
-    Input('current-pin-store', 'data'), State('pending-transaction-store', 'data'), prevent_initial_call=True)
+     Output('interval-component', 'disabled', allow_duplicate=True),
+     Output('animation-interval', 'disabled', allow_duplicate=True),
+     Output('animation-step-store', 'data', allow_duplicate=True)],
+    Input('current-pin-store', 'data'),
+    State('pending-transaction-store', 'data'),
+    prevent_initial_call=True
+)
 def process_payment(pin, data):
-    if not pin or len(pin) != 4: return no_update
-    if pin != '1234': return True, create_processing_animation('failed', "Invalid PIN."), False, '', no_update, False
+    if not pin or len(pin) != 4:
+        return [no_update] * 8
+
+    if pin != '1234':
+        body = create_processing_animation(status='failed', message="Invalid PIN.")
+        return True, body, False, '', no_update, True, True, 0
+
     is_success, msg = False, ""
     try:
         with get_db_connection() as conn:
             cursor = conn.cursor()
             if data['type'] == 'transfer':
-                bal = cursor.execute("SELECT balance FROM accounts WHERE id = ?", (data['from'],)).fetchone()[0]
-                if bal < data['amount']: raise ValueError("Insufficient funds.")
-                cursor.execute("UPDATE accounts SET balance = balance - ? WHERE id = ?", (data['amount'], data['from']))
-                cursor.execute("UPDATE accounts SET balance = balance + ? WHERE id = ?", (data['amount'], data['to']))
+                payload = data['payload']
+                amount = payload['amountExpected']
+                sender_acct = cursor.execute("SELECT id, balance FROM accounts WHERE accountNumber = ?",
+                                             (payload['senderAccount'],)).fetchone()
+                if not sender_acct:
+                    raise ValueError(f"Sender account {payload['senderAccount']} not found in the network.")
+
+                if sender_acct['balance'] < amount:
+                    raise ValueError("Insufficient funds in the sender's account.")
+
+                receiver_acct = cursor.execute("SELECT id FROM accounts WHERE accountNumber = ?",
+                                               (payload['clientAccount'],)).fetchone()
+                if not receiver_acct:
+                    raise ValueError(f"Recipient account {payload['clientAccount']} not found in the network.")
+
+                cursor.execute("UPDATE accounts SET balance = balance - ? WHERE id = ?", (amount, sender_acct['id']))
+                cursor.execute("UPDATE accounts SET balance = balance + ? WHERE id = ?", (amount, receiver_acct['id']))
                 cursor.execute("INSERT INTO transactions VALUES (?, ?, ?, ?, ?, ?, ?, ?)", (
-                f'txn{uuid.uuid4().hex[:6]}', data['from'], data['to'], data['amount'], 'transfer', 'completed',
-                datetime.datetime.now(pytz.timezone('Africa/Nairobi')).isoformat(), 'IFT'))
+                    payload['billRefNumber'], sender_acct['id'], receiver_acct['id'], amount, 'transfer', 'completed',
+                    datetime.datetime.now(pytz.timezone('Africa/Nairobi')).isoformat(), 'A2A-INTERNAL'))
+
             elif data['type'] == 'payroll':
-                corp_bal = cursor.execute("SELECT balance FROM accounts WHERE id = 'acc003'").fetchone()[0]
-                if corp_bal < data['amount']: raise ValueError("Insufficient corporate funds.")
-                cursor.execute("UPDATE accounts SET balance = balance - ? WHERE id = 'acc003'", (data['amount'],))
-                for emp in data['employees']:
-                    rec_id = cursor.execute("SELECT id FROM accounts WHERE accountNumber = ? AND bank = ?",
-                                            (emp['account'], emp['bank'])).fetchone()
-                    if rec_id: cursor.execute("UPDATE accounts SET balance = balance + ? WHERE id = ?",
-                                              (emp.get('amount', 0), rec_id[0]))
+                amount = data['amount']
+                ref = data['ref']
+                from_acct = 'acc003'  # Corporate Account ID
+                bal = cursor.execute("SELECT balance FROM accounts WHERE id = ?", (from_acct,)).fetchone()[0]
+                if bal < amount: raise ValueError("Insufficient corporate funds for payroll.")
+                cursor.execute("UPDATE accounts SET balance = balance - ? WHERE id = ?", (amount, from_acct))
                 cursor.execute("INSERT INTO transactions VALUES (?, ?, ?, ?, ?, ?, ?, ?)", (
-                f'txn{uuid.uuid4().hex[:6]}', 'acc003', None, data['amount'], 'payroll', 'completed',
-                datetime.datetime.now(pytz.timezone('Africa/Nairobi')).isoformat(), 'Bulk'))
+                    ref, from_acct, 'EXTERNAL_BULK', amount, 'payroll',
+                    'completed',
+                    datetime.datetime.now(pytz.timezone('Africa/Nairobi')).isoformat(), 'API-Bulk'))
+
             conn.commit()
             is_success = True
     except (sqlite3.Error, ValueError, TypeError, IndexError) as e:
         msg = str(e)
-    body, refresh, interval = (
-    create_processing_animation('success'), datetime.datetime.now().isoformat(), False) if is_success else (
-    create_processing_animation('failed', msg), no_update, False)
-    return True, body, False, '', refresh, interval
 
-
-@app.callback(Output('payment-modal', 'is_open', allow_duplicate=True), Input('cancel-payment-btn', 'n_clicks'),
-              prevent_initial_call=True)
-def cancel_confirmation(n): return False if n else no_update
+    if is_success:
+        initial_body = create_processing_animation(step=0)
+        return True, initial_body, False, '', datetime.datetime.now().isoformat(), True, False, 0
+    else:
+        fail_body = create_processing_animation(status='failed', message=msg)
+        return True, fail_body, False, '', no_update, True, True, 0
 
 
 @app.callback(
-    [Output('pin-modal', 'is_open'), Output('pin-entry-body', 'children'), Output('current-pin-store', 'data')],
-    [Input('continue-to-pin-btn', 'n_clicks'), Input('pin-cancel-btn', 'n_clicks'),
-     Input({'type': 'keypad-btn', 'index': ALL}, 'n_clicks')],
-    [State('current-pin-store', 'data')], prevent_initial_call=True)
-def handle_pin_modal(cont, canc, keys, pin):
-    trig_id = callback_context.triggered_id
-    if not trig_id: return no_update
-    if trig_id == 'continue-to-pin-btn': return True, create_mobile_keypad(), ''
-    if trig_id == 'pin-cancel-btn': return False, no_update, ''
-    if isinstance(trig_id, dict):
-        index, new_pin = trig_id['index'], pin or ""
-        if index == 'del':
-            new_pin = new_pin[:-1]
-        elif index == 'confirm':
-            return False, no_update, new_pin
-        elif len(new_pin) < 4:
-            new_pin += index
-        return True, create_mobile_keypad(new_pin), new_pin
-    return no_update
+    Output('processing-body', 'children', allow_duplicate=True),
+    Output('animation-step-store', 'data', allow_duplicate=True),
+    Output('animation-interval', 'disabled', allow_duplicate=True),
+    Output('interval-component', 'disabled', allow_duplicate=True),
+    Output('transaction-refresh-signal', 'data', allow_duplicate=True),
+    Input('animation-interval', 'n_intervals'),
+    State('animation-step-store', 'data'),
+    prevent_initial_call=True
+)
+def update_animation_step(n, current_step):
+    if n == 0:
+        return [no_update] * 5
+
+    next_step = current_step + 1
+    number_of_animation_steps = 4
+
+    if next_step <= number_of_animation_steps:
+        new_body = create_processing_animation(step=next_step)
+        is_animation_disabled = next_step == number_of_animation_steps
+        close_interval_disabled = not is_animation_disabled
+        refresh_signal = datetime.datetime.now().isoformat() if is_animation_disabled else no_update
+        return new_body, next_step, is_animation_disabled, close_interval_disabled, refresh_signal
+
+    return [no_update] * 5
+
+
+@app.callback(
+    [Output('pin-modal', 'is_open', allow_duplicate=True), Output('current-pin-store', 'data', allow_duplicate=True),
+     Output('pin-entry-body', 'children', allow_duplicate=True)],
+    [Input('pin-cancel-btn', 'n_clicks'), Input({'type': 'keypad-btn', 'index': ALL}, 'n_clicks')],
+    [State('current-pin-store', 'data')], prevent_initial_call=True
+)
+def handle_pin_modal(canc, keys, pin):
+    ctx = callback_context
+    trig_id = ctx.triggered_id
+
+    if trig_id == 'pin-cancel-btn':
+        return False, '', no_update
+
+    if not isinstance(trig_id, dict):
+        return no_update, no_update, no_update
+
+    index = trig_id['index']
+    new_pin = pin or ""
+
+    if index == 'del':
+        new_pin = new_pin[:-1]
+    elif index == 'confirm':
+        return False, new_pin, no_update
+    elif len(new_pin) < 4:
+        new_pin += index
+
+    return True, new_pin, create_mobile_keypad(new_pin)
 
 
 @app.callback(Output('processing-modal', 'is_open', allow_duplicate=True), Input('interval-component', 'n_intervals'),
@@ -741,5 +973,4 @@ def manual_close_processing_modal(n): return False, True
 
 
 if __name__ == '__main__':
-    app.run(debug=True, port=6659)
-
+    app.run(debug=True, port=6639)
