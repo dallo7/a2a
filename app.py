@@ -1146,7 +1146,7 @@ def create_processing_animation(step=0, status='processing', message=None):
         ], className="text-center p-4")
 
     animation_steps = [
-        {"icon": "fa-network-wired", "text": "Contacting Banking Network...", "progress": 20},
+        {"icon": "fa-network-wired", "text": " Capital Pay Aggregator Engine Contacting Banking Network...", "progress": 20},
         {"icon": "fa-shield-alt", "text": "Encrypting Transaction Details...", "progress": 40},
         {"icon": "fa-random", "text": "Authorizing Payment...", "progress": 60},
         {"icon": "fa-money-bill-wave", "text": "Securely Transferring Funds...", "progress": 80},
@@ -2081,3 +2081,4 @@ def manual_close_processing_modal(n): return False, True
 
 if __name__ == '__main__':
     app.run(debug=True, port=8859)
+
