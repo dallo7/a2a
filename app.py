@@ -3430,9 +3430,9 @@ def create_processing_animation(step=0, status='processing', message=None):
 
     animation_steps = [
         {"icon": "fa-network-wired", "text": " Capital Pay Aggregator Engine Contacting Banking Network...",
-         "progress": 20},
+         "progress": 60},
         {"icon": "fa-shield-alt", "text": "Encrypting Transaction Details...", "progress": 40},
-        {"icon": "fa-random", "text": "Authorizing Payment...", "progress": 60},
+        {"icon": "fa-random", "text": "Authorizing Payment...", "progress": 20},
         {"icon": "fa-money-bill-wave", "text": "Securely Transferring Funds...", "progress": 80},
     ]
 
@@ -3675,7 +3675,7 @@ def create_header():
             html.Div([
                 html.I(className="fas fa-landmark text-primary me-3", style={'fontSize': '2.5rem'}),
                 html.Div([
-                    html.H1("Money Transfer Services - MTS - ", className="app-title"),
+                    html.H1("CP-Money Transfer Services", className="app-title"),
                     html.P("Secure Corporate Payments", className="app-subtitle")
                 ])
             ], className="d-flex align-items-center")
@@ -4372,3 +4372,4 @@ def display_payment_notification(transaction_data):
 
 if __name__ == '__main__':
     app.run(debug=True, port=8859)
+
