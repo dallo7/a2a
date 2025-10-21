@@ -1,0 +1,79 @@
+/* --- CAPITAL PAY BRAND OVERRIDES (assets/capitalpay_brand.css) --- */
+
+/* Brand Colors defined here */
+:root {
+    --cp-primary: #EF5E41;
+    --cp-secondary: #006E92;
+    --cp-accent-purple: #892887;
+    --cp-accent-orange: #F27224;
+    --cp-background: #f7f9fc;
+}
+
+/* 1. Typography and General Background */
+body {
+    /* Simulating Helvetica Now with a modern sans-serif stack */
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
+    background-color: var(--cp-background);
+}
+
+.app-title, .app-subtitle {
+    font-weight: bold;
+}
+
+/* 2. Primary Color Overrides (Buttons, Links, etc.) */
+.btn-primary, .btn-primary:hover, .btn-primary:focus, .btn-primary:active,
+.bg-primary, .text-primary {
+    background-color: var(--cp-primary) !important;
+    border-color: var(--cp-primary) !important;
+    color: white !important;
+}
+
+/* 3. Secondary Color Overrides (KPIs, Success/Teal) */
+.fw-bold.text-success, .text-success, .alert-success {
+    color: var(--cp-secondary) !important;
+    border-color: var(--cp-secondary) !important;
+}
+.alert-success {
+    background-color: #e6f5ff !important; /* Lighter background for the alert */
+}
+
+/* 4. Navigation/Accent Styles */
+.nav-pills .nav-link.active, .nav-pills .nav-link.active:hover {
+    color: var(--cp-accent-purple) !important; /* Use deep accent for active links text */
+    background-color: #f0f0f0 !important;
+    border-left: 5px solid var(--cp-accent-purple) !important;
+    border-radius: 0 5px 5px 0 !important;
+}
+.nav-pills .nav-link {
+    color: var(--cp-secondary) !important; /* Non-active links use secondary color */
+}
+
+/* 5. Semantic/Branded Colors */
+/* 'From' Account Icon and Danger Text mapped to CP_PRIMARY */
+.text-danger {
+    color: var(--cp-primary) !important;
+}
+
+/* Processing Animations/Headers */
+.form-section-card-header {
+    font-weight: bold;
+    color: var(--cp-secondary) !important;
+}
+.progress-bar {
+    background-color: var(--cp-primary) !important;
+}
+
+/* Footer Style */
+.app-footer {
+    background-color: var(--cp-secondary) !important; /* Dark Teal Footer */
+}
+
+/* KPI icon color fixes */
+.fas.fa-university {
+    color: var(--cp-secondary);
+}
+
+/* Data Table Header Styling */
+#payroll-table th {
+    color: var(--cp-secondary) !important;
+}
