@@ -218,8 +218,8 @@ ENCODED_LOGO = STATIC_LOGO_URL
 # --- Initialize App ---
 app = dash.Dash(
     __name__,
+    title="CapitalPay Operating System"
     suppress_callback_exceptions=True,
-    # Use BOOTSTRAP and FONT_AWESOME, and load custom styles from the assets folder
     external_stylesheets=[dbc.themes.BOOTSTRAP, dbc.icons.FONT_AWESOME, '/assets/capitalpay_brand.css'], 
     meta_tags=[{"name": "viewport", "content": "width=device-width, initial-scale=1"}]
 )
@@ -1631,4 +1631,5 @@ def update_analytics_page(pathname, refresh_signal):
 if __name__ == '__main__':
     pd.set_option('future.no_silent_downcasting', True)
     app.run(debug=True, port=8899)
+
 
